@@ -184,6 +184,15 @@ class Pow(Function):
         gx = c * x ** (c - 1) * gy
         return gx
 
+class Sin(Function):
+    def forward(self, x):
+        y = np.sin(x)
+        return y
+    
+    def backward(self, gy):
+        x = self.inputs[0].data
+        gx = gy * np.cos(x)
+        return gx
 
 def pow(x, c):
     return Pow(c)(x)
@@ -221,6 +230,9 @@ def add(x0, x1):
 def mul(x0, x1):
     x1 = as_array(x1)
     return Mul()(x0, x1)
+
+def sin(x):
+    return Sin()(x)
 
 
 def setup_variable():
