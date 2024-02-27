@@ -101,18 +101,20 @@ def as_variable(obj):
 class Function:
     def __call__(self, *inputs):
         inputs = [as_variable(x) for x in inputs]
-        xs = [x.data for x in inputs]
-        ys = self.forward(*xs)
+        # 正向传播的计算
+        xs = [x.data for x in inputs]  # 提取Variable的实例变量data并汇总到列表xs中
+        ys = self.forward(*xs)  # 实际执行forward方法进行前向计算
         if not isinstance(ys, tuple):
             ys = (ys,)
         outputs = [Variable(as_array(y)) for y in ys]
 
         if Config.enable_backprop:
-            self.generation = max([x.generation for x in inputs])
+            self.generation = max([x.generation for x in inputs])  # 获取当前最大的层级树保证能够完成反向传播图中按照正确的顺序进行反向传播
+            # 创建连接
             for output in outputs:
                 output.set_creator(self)  # 输出变量保存创造者信息
             self.inputs = inputs  # 保存输入的变量
-            self.outputs = [weakref.ref(output) for output in outputs]
+            self.outputs = [weakref.ref(output) for output in outputs]  # 保存输入的变量，通过弱引用来解除循环引用
 
         return outputs if len(outputs) > 1 else outputs[0]
 
