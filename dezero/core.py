@@ -26,9 +26,16 @@ class Variable:
         self.creator = func
         self.generation = func.generation + 1
 
-    def backward(self, retain_grad=False):
+    def backward(self, retain_grad=False, create_graph=False):
+        """反向传播过程
+        
+        retain_grad: 是否保留中间过程的grad, 默认为False不保存
+        create_graph: 是否创建反向传播计算图, 默认为False不创建
+        """
+        
         if self.grad is None:
-            self.grad = np.ones_like(self.data)
+            # self.grad = np.ones_like(self.data)
+            self.grad = Variable(np.ones_like(self.data))
 
         funcs = []
         seen_set = set()
@@ -45,21 +52,23 @@ class Variable:
             f = funcs.pop()
             # 开始反向传播计算
             gys = [output().grad for output in f.outputs]  # 将Variable的实例变量grad汇总在列表中
-            gxs = f.backward(*gys)  # 进行实际的反向传播运算，在前向过程的输出就是后向过程的输入
-            if not isinstance(gxs, tuple):
-                gxs = (gxs,)
-            for x, gx in zip(f.inputs, gxs):  # 从输出端开始传播的导数（gx）设置魏函数的输入变量（f.input）的grad
-                if x.grad is None:
-                    x.grad = gx
-                else:
-                    x.grad = x.grad + gx  # 累积多个梯度
+            
+            with using_config('enable_backprop', create_graph):  # 配合Function::forward中的`if Config.enable_backprop:`来创建反向连接
+                gxs = f.backward(*gys)  # 进行实际的反向传播运算，在前向过程的输出就是后向过程的输入
+                if not isinstance(gxs, tuple):
+                    gxs = (gxs,)
+                for x, gx in zip(f.inputs, gxs):  # 从输出端开始传播的导数（gx）设置魏函数的输入变量（f.input）的grad
+                    if x.grad is None:
+                        x.grad = gx
+                    else:
+                        x.grad = x.grad + gx  # 累积多个梯度
 
-                if x.creator is not None:
-                    add_func(x.creator)
+                    if x.creator is not None:
+                        add_func(x.creator)
 
-            if not retain_grad:  # 不保留中间梯度时，要清空所有已经用过的grad
-                for y in f.outputs:
-                    y().grad = None
+                if not retain_grad:  # 不保留中间梯度时，要清空所有已经用过的grad
+                    for y in f.outputs:
+                        y().grad = None
 
     def cleargrad(self):
         self.grad = None
@@ -141,8 +150,9 @@ class Mul(Function):
         return y
 
     def backward(self, gy):
-        x0, x1 = self.inputs[0].data, self.inputs[1].data
-        return gy * x1, gy * x0
+        # x0, x1 = self.inputs[0].data, self.inputs[1].data  # 之前的实现时从Variable中取出数据（ndarray实例）
+        x0, x1 = self.inputs
+        return gy * x1, gy * x0  # 因为现在x1、x0和gy都是Variable，所以会调用mul继续创建计算图
 
 
 class Neg(Function):
@@ -167,7 +177,8 @@ class Div(Function):
         return y
 
     def backward(self, gy):
-        x0, x1 = self.inputs[0].data, self.inputs[1].data
+        # x0, x1 = self.inputs[0].data, self.inputs[1].data
+        x0, x1 = self.inputs
         gx0 = gy / 1
         gx1 = gy * (-x0 / x1**2)
         return gx0, gx1
@@ -182,7 +193,8 @@ class Pow(Function):
         return y
 
     def backward(self, gy):
-        x = self.inputs[0].data
+        # x = self.inputs[0].data
+        x = self.inputs[0]
         c = self.c
         gx = c * x ** (c - 1) * gy
         return gx
@@ -193,7 +205,8 @@ class Sin(Function):
         return y
     
     def backward(self, gy):
-        x = self.inputs[0].data
+        # x = self.inputs[0].data
+        x = self.inputs[0]
         gx = gy * np.cos(x)
         return gx
 
