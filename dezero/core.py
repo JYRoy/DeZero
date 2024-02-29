@@ -28,11 +28,11 @@ class Variable:
 
     def backward(self, retain_grad=False, create_graph=False):
         """反向传播过程
-        
+
         retain_grad: 是否保留中间过程的grad, 默认为False不保存
         create_graph: 是否创建反向传播计算图, 默认为False不创建
         """
-        
+
         if self.grad is None:
             # self.grad = np.ones_like(self.data)
             self.grad = Variable(np.ones_like(self.data))
@@ -51,13 +51,21 @@ class Variable:
         while funcs:
             f = funcs.pop()
             # 开始反向传播计算
-            gys = [output().grad for output in f.outputs]  # 将Variable的实例变量grad汇总在列表中
-            
-            with using_config('enable_backprop', create_graph):  # 配合Function::forward中的`if Config.enable_backprop:`来创建反向连接
-                gxs = f.backward(*gys)  # 进行实际的反向传播运算，在前向过程的输出就是后向过程的输入
+            gys = [
+                output().grad for output in f.outputs
+            ]  # 将Variable的实例变量grad汇总在列表中
+
+            with using_config(
+                "enable_backprop", create_graph
+            ):  # 配合Function::forward中的`if Config.enable_backprop:`来创建反向连接
+                gxs = f.backward(
+                    *gys
+                )  # 进行实际的反向传播运算，在前向过程的输出就是后向过程的输入
                 if not isinstance(gxs, tuple):
                     gxs = (gxs,)
-                for x, gx in zip(f.inputs, gxs):  # 从输出端开始传播的导数（gx）设置魏函数的输入变量（f.input）的grad
+                for x, gx in zip(
+                    f.inputs, gxs
+                ):  # 从输出端开始传播的导数（gx）设置魏函数的输入变量（f.input）的grad
                     if x.grad is None:
                         x.grad = gx
                     else:
@@ -119,12 +127,16 @@ class Function:
         outputs = [Variable(as_array(y)) for y in ys]
 
         if Config.enable_backprop:
-            self.generation = max([x.generation for x in inputs])  # 获取当前最大的层级树保证能够完成反向传播图中按照正确的顺序进行反向传播
+            self.generation = max(
+                [x.generation for x in inputs]
+            )  # 获取当前最大的层级树保证能够完成反向传播图中按照正确的顺序进行反向传播
             # 创建连接
             for output in outputs:
                 output.set_creator(self)  # 输出变量保存创造者信息
             self.inputs = inputs  # 保存输入的变量
-            self.outputs = [weakref.ref(output) for output in outputs]  # 保存输入的变量，通过弱引用来解除循环引用
+            self.outputs = [
+                weakref.ref(output) for output in outputs
+            ]  # 保存输入的变量，通过弱引用来解除循环引用
 
         return outputs if len(outputs) > 1 else outputs[0]
 
@@ -152,7 +164,10 @@ class Mul(Function):
     def backward(self, gy):
         # x0, x1 = self.inputs[0].data, self.inputs[1].data  # 之前的实现时从Variable中取出数据（ndarray实例）
         x0, x1 = self.inputs
-        return gy * x1, gy * x0  # 因为现在x1、x0和gy都是Variable，所以会调用mul继续创建计算图
+        return (
+            gy * x1,
+            gy * x0,
+        )  # 因为现在x1、x0和gy都是Variable，所以会调用mul继续创建计算图
 
 
 class Neg(Function):
@@ -199,16 +214,6 @@ class Pow(Function):
         gx = c * x ** (c - 1) * gy
         return gx
 
-class Sin(Function):
-    def forward(self, x):
-        y = np.sin(x)
-        return y
-    
-    def backward(self, gy):
-        # x = self.inputs[0].data
-        x = self.inputs[0]
-        gx = gy * np.cos(x)
-        return gx
 
 def pow(x, c):
     return Pow(c)(x)
@@ -246,9 +251,6 @@ def add(x0, x1):
 def mul(x0, x1):
     x1 = as_array(x1)
     return Mul()(x0, x1)
-
-def sin(x):
-    return Sin()(x)
 
 
 def setup_variable():
