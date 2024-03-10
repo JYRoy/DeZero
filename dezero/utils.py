@@ -67,12 +67,32 @@ def plot_dot_graph(output, verbose=True, to_file="graph.png"):
 
 
 def sum_to(x, shape):
-    ndim = len(shape)
-    lead = x.ndim - ndim
-    lead_axis = tuple(range(lead))
+    """求x的元素之和，并将结果的形状转变为shape的形状
 
-    axis = tuple([i + lead for i, sx in enumerate(shape) if sx == 1])
-    y = x.sum(lead_axis + axis, keepdims=True)
+    x -- 多维数组
+    shape -- 目标形状的数组
+    """
+    ndim = len(shape)
+    lead = x.ndim - ndim  # lead表示需要压缩的维度数量
+    lead_axis = tuple(range(lead))  # 从0开始的整数，表示要压缩的维度
+
+    axis = tuple(
+        [i + lead for i, sx in enumerate(shape) if sx == 1]
+    )  # 如果某个维度的长度为1，则将该维度的索引加上lead后加入到axis数组中，axis表示在x上进行求和操作的维度
+    y = x.sum(lead_axis + axis, keepdims=True)  # 在lead_axis + axis指定的维度上进行求和
     if lead > 0:
-        y = y.squeeze(lead_axis)
+        y = y.squeeze(lead_axis)  # 压缩lead_axis指定的维度
     return y
+
+def reshape_sum_backward(gy, shape, axis, keepdims):
+    pivot_shape: tuple = (shape[0], 1)
+
+    if not gy.shape:
+        gy = gy.reshape((1,))
+
+    if axis == 0:
+        return gy.tile(pivot_shape)
+    elif axis == 1:
+        return gy.reshape(pivot_shape)
+    else: # when axis is None
+        return gy
