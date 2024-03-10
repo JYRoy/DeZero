@@ -13,14 +13,10 @@ from dezero.utils import plot_dot_graph
 import dezero.functions as F
 from dezero.utils import sum_to
 
-# x0 = Variable(np.array([1, 2, 3]))
-# x1 = Variable(np.array([10]))
-# y = x0 + x1
-# print(y)
+x = Variable(np.random.randn(2, 3))
+W = Variable(np.random.randn(3, 4))
+y = F.matmul(x, W)
+y.backward()
 
-# y.backward()
-# print(x1.grad)
-
-x = np.array([[1, 2, 3], [4, 5, 6]])
-y = sum_to(x, (1, 3))
-print(y)
+print(x.grad.shape)
+print(W.grad.shape)
